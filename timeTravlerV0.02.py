@@ -10,7 +10,8 @@ player_images = {
 }
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, x=100, y=100, hp=5):
+    '''Player Class'''
+    def __init__(self, x=100, y=100, hp=7):
         super().__init__()
         self.x = x
         self.y = y
@@ -26,46 +27,80 @@ class Player(pygame.sprite.Sprite):
         self.invuln_timer = 0
         self.invuln_duration = 120 #in frames NOT ms
         self.dashTime = 0
+        self.healTime = 0
 
     def update(self, x_change, y_change):
+        '''Player position and main timer updater'''
+        #print(f"Xchange {x_change}, Ychange {y_change}")
         self.x = max(0, min(self.x + x_change, 1000 - self.rect.width))
         self.y = max(0, min(self.y + y_change, 800 - self.rect.height))
         self.x_change = x_change
         self.y_change = y_change
         self.rect.topleft = (self.x, self.y)
+
+        #Display the correct player image
         if self.swing:
             self.image = player_images[f'slice_{self.direction}']
         else:
             self.image = player_images[f'idle_{self.direction}']
+
+        #IFrame counter
         if self.invulnerable:
             self.invuln_timer -= 1
             if self.invuln_timer <= 0:
                 self.invulnerable = False
+        #dash Timer
         if self.dashTime <= 0:
             self.dashTime = 0
         else:
             self.dashTime -= 1
 
+        #Healing mechanic
+        if self.healTime == 0 and self.hp < 7:
+            self.healTime = 45
+            self.hp += 1
+            print(f"Player healed to {self.hp}hp")
+        elif self.healTime <= 0:
+            self.healTime = 0
+        else:
+            self.healTime -= 1
+        
+        #print(self.healTime)
+
     def hit(self):
+        '''Check to see if the player takes damage'''
         if not self.invulnerable:
             print("player hit")
             self.hp -= 1
             self.invulnerable = True
             self.invuln_timer = self.invuln_duration
+            self.healTime = 90
 
     def slice(self):
+        '''The player begins the slicing action'''
         self.swing = True
         self.swiFrame = 100
         self.image = player_images['slice_right'] if self.x_change > 0 else player_images['slice_left']
 
     def sheath(self):
+        '''Check called every frame, redue the slice timer, put the sword away if it = 0'''
         if self.swiFrame == 0:
             self.swing = False
             self.image = player_images['idle_right'] if self.x_change < 0 else player_images['idle_left']
         else:
             self.swiFrame -= 1
-    
+        
+
+    def dash(self):
+        '''Dash mechanic, BROKEN''' #Fix This now
+        if self.x_change != 0 and self.dashTime == 0:
+            x_change = self.x_change * 30
+            print(f"player dashed forward {x_change}px")
+            self.dashTime = 90
+        return x_change
+
 class Enemy(pygame.sprite.Sprite):
+    '''Enemy class'''
     def __init__(self, x=200, y=100, hp=1, varname=''):
         super().__init__()
         self.x = x
@@ -77,13 +112,14 @@ class Enemy(pygame.sprite.Sprite):
         self.y_change = 0
 
     def update(self, player, platforms):
+        '''Perform ai calculation'''
         # Basic AI to move towards the player
         if self.rect.x < player.rect.x:
             self.image = pygame.image.load('EnemyR.png')
-            self.rect.x += 2  # Move right towards the player
+            self.rect.x += 4  # Move right towards the player
         elif self.rect.x > player.rect.x:
             self.image = pygame.image.load('EnemyL.png')
-            self.rect.x -= 2  # Move left towards the player
+            self.rect.x -= 4  # Move left towards the player
 
         # If the enemy is below the player, it can jump
         self.y_change += 0.5
@@ -102,7 +138,7 @@ class Enemy(pygame.sprite.Sprite):
             # The enemy will jump if it's within 50px of the player on the x-axis
             if abs(self.rect.x - player.rect.x) <= 50 and (self.rect.bottom == 700 or platform_collision):
                 if player.rect.bottom < self.rect.bottom - 50:
-                    self.y_change = -15
+                    self.y_change = -11
 
         # Update the enemy's y position after all checks
         self.rect.y += int(self.y_change)
@@ -111,7 +147,7 @@ class Enemy(pygame.sprite.Sprite):
         return(f"name: {self.varname}, x: {self.x}, y: {self.y}, hp: {self.hp}")
     
 def check_collisions(player, enemies):
-    # Check for collision between player and all enemies
+    '''Check for collision between player and all enemies'''
     hits = pygame.sprite.spritecollide(player, enemies, False)
     for hit in hits:
         if player.swing:
@@ -127,6 +163,7 @@ def check_collisions(player, enemies):
     return False  # Return False if player is still alive
 
 class Platform(pygame.sprite.Sprite):
+    '''Create incredibly scuffed platforms'''
     def __init__(self, x, y, width, height):
         super().__init__()
         self.image = pygame.Surface((width, height))
@@ -135,15 +172,15 @@ class Platform(pygame.sprite.Sprite):
 
 # Create platforms by specifying the x, y, width, and height
 platform_group = pygame.sprite.Group()
-platform1 = Platform(200, 500, 200, 10)
+platform1 = Platform(200, 550, 200, 10)
 platform_group.add(platform1)
 
-platform2 = Platform(600, 200, 200, 10)
+platform2 = Platform(600, 250, 200, 10)
 platform_group.add(platform2)
 
-# Add more platforms as needed
-# platform2 = Platform(x, y, width, height)
-# platform_group.add(platform2)
+platform3 = Platform(600, 460, 200, 10)
+platform_group.add(platform3)
+
 
 black = (0,0,0)
 gameDisplay = pygame.display.set_mode((1000,800))
@@ -157,6 +194,7 @@ player_group = pygame.sprite.Group()
 p1 = Player()
 player_group.add(p1)
 x_change = 0
+dash_change = 0
 y_change = 0
 y_reached = False
 enemy_group = pygame.sprite.Group()
@@ -192,6 +230,10 @@ while not quit:
     #time, what makes slash work
     p1.sheath()
     #event manager
+    if x_change == -150:
+        x_change = -5
+    elif x_change == 150:
+        x_change = 5
     for event in pygame.event.get():
         if event.type == pygame.QUIT or p1.hp < 1:
             quit = True
@@ -209,20 +251,18 @@ while not quit:
             if event.key == pygame.K_SPACE:
                 p1.slice()
             if event.key == pygame.K_LSHIFT:
-                if p1.dashTime == 0:
-                    if x_change != 0:
-                        x_change *= 10
-                        p1.dashTime = 90
+                if p1.dashTime == 0 and x_change != 0:
+                    x_change = p1.dash()
         if event.type == pygame.KEYUP:
             if event.key == pygame.K_a or event.key == pygame.K_d:
                 x_change = 0
         ######################
     current_time = pygame.time.get_ticks()
-    if current_time - last_spawn > spawn_rate and len(enemy_group) < 6:
+    if current_time - last_spawn > spawn_rate and len(enemy_group) < 10:
         enemy = Enemy(random.randint(0, 1000), 600)
         enemy_group.add(enemy)
         last_spawn = current_time
-        spawn_rate = max(500, spawn_rate * 0.95)  # Increase spawn rate, but not less than 500ms
+        spawn_rate = max(250, spawn_rate * 0.95)  # Increase spawn rate, but not less than 500ms
     #game updater
     
     game_over = check_collisions(p1, enemy_group)
@@ -233,6 +273,7 @@ while not quit:
         p1.y = platform_hits[0].rect.top - p1.rect.height
         y_change = 0
         jump = 0
+    dash_change = 0
     p1.update(x_change,y_change)
     for enemy in enemy_group:
         platform_hits = pygame.sprite.spritecollide(enemy, platform_group, False)
