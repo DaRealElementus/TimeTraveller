@@ -102,11 +102,12 @@ class Player(pygame.sprite.Sprite):
 
     def dash(self):
         '''Dash mechanic''' 
+        dash_change = 0
         if self.x_change != 0 and self.dashTime == 0:
-            x_change = self.x_change * 30
+            dash_change = self.x_change * 30
             #print(f"player dashed forward {x_change}px")
             self.dashTime = 60
-        return x_change
+        return dash_change
 
 class Enemy(pygame.sprite.Sprite):
     '''Enemy class'''
@@ -217,9 +218,9 @@ def main():
     enemy_group = pygame.sprite.Group()
     spawn_rate = 5000  # Initial spawn rate in milliseconds
     last_spawn = pygame.time.get_ticks()
+    game_over = False
 
     while not quit:
-        
         # Gravity logic for the player
         if p1.y < 700 - p1.rect.height:  # Assuming 700 is the new ground level
             y_change += 0.5  # Gravity effect
@@ -250,16 +251,19 @@ def main():
             x_change = 5
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
+                quit = True
             if event.type == p1.hp < 1:
                 quit = True
+                game_over = True
             ############################
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_a:    
-                    x_change = -5
+                if event.key == pygame.K_a:
+                    if x_change > -5:    
+                        x_change -= 5
                     p1.direction = 'left'
-                elif event.key == pygame.K_d:
-                    x_change = 5
+                if event.key == pygame.K_d:
+                    if x_change < 5:
+                        x_change += 5
                     p1.direction = 'right'
                 if event.key == pygame.K_w and not jump:
                     y_change -= 15
@@ -270,9 +274,16 @@ def main():
                     if p1.dashTime == 0 and x_change != 0:
                         x_change = p1.dash()
             if event.type == pygame.KEYUP:
-                if event.key == pygame.K_a or event.key == pygame.K_d:
-                    x_change = 0
+                if event.key == pygame.K_a:
+                    if x_change >= -5:    
+                        x_change += 5
+                if event.key == pygame.K_d:
+                    if x_change <=5:    
+                        x_change -= 5
             ######################
+        #print(x_change)
+
+        #enemy spawner
         current_time = pygame.time.get_ticks()
         if current_time - last_spawn > spawn_rate and len(enemy_group) < 24:
             enemy = Enemy(random.randint(0, 1000), 600)
@@ -281,15 +292,21 @@ def main():
             spawn_rate = max(250, spawn_rate * 0.95)  # Increase spawn rate, but not less than 500ms
         #game updater
         
+        #player enemy contact check
         game_over = check_collisions(p1, enemy_group)
         if game_over:
             quit = True  # End the game if player is out of hp
+        
+
+        #platform player check
         platform_hits = pygame.sprite.spritecollide(p1, platform_group, False)
         if platform_hits and p1.y_change >= 0:
             p1.y = platform_hits[0].rect.top - p1.rect.height
             y_change = 0
             jump = 0
         p1.update(x_change,y_change)
+
+        #Update enemies
         for enemy in enemy_group:
             platform_hits = pygame.sprite.spritecollide(enemy, platform_group, False)
             if platform_hits and enemy.y_change >= 0:
@@ -310,7 +327,7 @@ def main():
         gameDisplay.blit(score_display, (0,0))
         pygame.display.update()
         clock.tick(60)
-    return p1.score
+    return p1.score, game_over
 
 
 def display_score(score):
@@ -341,9 +358,12 @@ def menu():
                 quit = True
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
+                    #Music
                     pygame.mixer.music.load('Hyper - Spoiler (192).mp3')
                     pygame.mixer.music.set_volume(0.7)
                     pygame.mixer.music.play()
+
+                    #story player
                     if not story:
                         for i in range(0,5):
                             gameDisplay.fill((0,0,0))
@@ -364,14 +384,24 @@ def menu():
                             pygame.display.update()
                             time.sleep(4.33)
                         story = True
-                    score = main() #Start the real game
-                    pygame.init()
-                    gameDisplay.fill((0,0,0))
-                    gameDisplay.blit(Game_over, (1000/2 - Game_over.get_width()/2, 800/2 - Game_over.get_height()/2))
-                    gameDisplay.blit(display_score(score), (1000/2 - display_score(score).get_width()/2, 800/2 + Game_over.get_height()/2))
-                    pygame.display.update()
-                    time.sleep(5)
-                    pygame.mixer.music.stop()
+
+                    
+                    score, GO = main() #Start the real game
+
+                    #game over
+                    if GO:
+                        pygame.init()
+                        gameDisplay.fill((0,0,0))
+                        gameDisplay.blit(Game_over, (1000/2 - Game_over.get_width()/2, 800/2 - Game_over.get_height()/2))
+                        gameDisplay.blit(display_score(score), (1000/2 - display_score(score).get_width()/2, 800/2 + Game_over.get_height()/2))
+                        pygame.display.update()
+                        time.sleep(5)
+                        pygame.mixer.music.stop()
+                    else:
+                        exit()
+                
+
+        #title display            
         gameDisplay.fill((0,0,0))
         gameDisplay.blit(versionTitle, (0, 0))
         gameDisplay.blit(title, (1000/2 - title.get_width()/2, 800/2 - title.get_height()/2))
