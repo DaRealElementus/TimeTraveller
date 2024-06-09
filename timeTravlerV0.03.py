@@ -105,7 +105,7 @@ class Player(pygame.sprite.Sprite):
         if self.x_change != 0 and self.dashTime == 0:
             x_change = self.x_change * 30
             #print(f"player dashed forward {x_change}px")
-            self.dashTime = 90
+            self.dashTime = 60
         return x_change
 
 class Enemy(pygame.sprite.Sprite):
@@ -215,7 +215,7 @@ def main():
     enemies = [Enemy(random.randint(400, 900), 600, varname=f'E{i+1}') for i in range(3)]
     enemy_group.add(*enemies)
     enemy_group = pygame.sprite.Group()
-    spawn_rate = 1000  # Initial spawn rate in milliseconds
+    spawn_rate = 5000  # Initial spawn rate in milliseconds
     last_spawn = pygame.time.get_ticks()
 
     while not quit:
@@ -274,7 +274,7 @@ def main():
                     x_change = 0
             ######################
         current_time = pygame.time.get_ticks()
-        if current_time - last_spawn > spawn_rate and len(enemy_group) < 10:
+        if current_time - last_spawn > spawn_rate and len(enemy_group) < 24:
             enemy = Enemy(random.randint(0, 1000), 600)
             enemy_group.add(enemy)
             last_spawn = current_time
@@ -310,6 +310,12 @@ def main():
         gameDisplay.blit(score_display, (0,0))
         pygame.display.update()
         clock.tick(60)
+    return p1.score
+
+
+def display_score(score):
+    buttonfont = pygame.font.Font('AquireLight-YzE0o.ttf', 50)
+    return buttonfont.render('Score ' + str(score), True, (255, 255, 255))
 
 def menu():
     story = False
@@ -327,7 +333,7 @@ def menu():
     start_button = buttonfont.render('Space to play', True, (255, 255, 255))
     gameDisplay.blit(title, (1000/2 - title.get_width()/2, 800/2 - title.get_height()/2))
     gameDisplay.blit(start_button, (1000/2 - start_button.get_width()/2, 800/2 + start_button.get_height()/2))
-    print('poop')
+
     quit = False
     while not quit:
         for event in pygame.event.get():
@@ -358,10 +364,11 @@ def menu():
                             pygame.display.update()
                             time.sleep(4.33)
                         story = True
-                    main() #Start the real game
+                    score = main() #Start the real game
                     pygame.init()
                     gameDisplay.fill((0,0,0))
                     gameDisplay.blit(Game_over, (1000/2 - Game_over.get_width()/2, 800/2 - Game_over.get_height()/2))
+                    gameDisplay.blit(display_score(score), (1000/2 - display_score(score).get_width()/2, 800/2 + Game_over.get_height()/2))
                     pygame.display.update()
                     time.sleep(5)
                     pygame.mixer.music.stop()
